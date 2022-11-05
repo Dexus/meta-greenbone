@@ -1,13 +1,16 @@
 SUMMARY = "gvm-libs recipe"
 DESCRIPTION = "Recipe for gvm-libs from greenbone"
-LICENSE = "GPLv2"
+LICENSE = "GPL-2.0-only"
 LIC_FILES_CHKSUM = "file://COPYING;md5=59530bdf33659b29e73d4adb9f9f6552"
 
-PR="0"
+PR="r0"
+
 inherit logging
 
 SRCREV = "6d01858f7128b3ac5fd8ba8d2b728caa77e7b790"
-SRC_URI ="git://github.com/greenbone/gvm-libs.git;branch=main;protocol=https"
+SRC_URI = "git://github.com/greenbone/gvm-libs.git;branch=main;protocol=https \
+           file://0001-Fix-CMake-lib-checks-to-find-all-libs.patch \
+           "
 
 S = "${WORKDIR}/git"
 
@@ -19,22 +22,9 @@ inherit cmake pkgconfig
 
 PACKAGECONFIG ??=""
 
-EXTRA_OECMAKE=""
+EXTRA_OECMAKE = " -DCMAKE_BUILD_TYPE=Release -DEXEC_PREFIX=${exec_prefix} -DLIBDIR=${baselib} "
 OECMAKE_GENERATOR="Unix Makefiles"
-do_configure:prepend (){
-    bbwarn "${S}"
-}
 
-do_install(){
-    make install
-}
+FILES:${PN}:append = " /run"
 
-python do_display_banner() {
-    bb.plain("***********************************************");
-    bb.plain("*                                             *");
-    bb.plain("*               gvm-libs recipe               *");
-    bb.plain("*                                             *");
-    bb.plain("***********************************************");
-}
-
-addtask display_banner before do_build
+INSANE_SKIP:${PN} += "empty-dirs"

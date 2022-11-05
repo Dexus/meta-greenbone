@@ -1,0 +1,170 @@
+From 3d0819c639bcae994cfa0ef4e514a44a253bf3c9 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Josef=20Fr=C3=B6hle?= <github@josef-froehle.de>
+Date: Sat, 5 Nov 2022 14:51:00 +0100
+Subject: [PATCH] Fix CMake lib checks to find all libs
+
+---
+ boreas/CMakeLists.txt | 51 +++++++++++++++++------------
+ util/CMakeLists.txt   | 76 ++++++++++++++++++++++++-------------------
+ 2 files changed, 72 insertions(+), 55 deletions(-)
+
+diff --git a/boreas/CMakeLists.txt b/boreas/CMakeLists.txt
+index e2f86b23..41c258ce 100644
+--- a/boreas/CMakeLists.txt
++++ b/boreas/CMakeLists.txt
+@@ -48,28 +48,37 @@ else (LIBNET_CONFIG)
+ endif (LIBNET_CONFIG)
+ 
+ message (STATUS "Looking for pcap...")
+-find_library (PCAP pcap)
+-message (STATUS "Looking for pcap... ${PCAP}")
+-if (NOT PCAP)
+-  message (SEND_ERROR "The pcap library is required.")
+-endif (NOT PCAP)
+-
+-message (STATUS "Looking for pcap-config...")
+-find_program (PCAP_CONFIG pcap-config)
+ 
+-if (PCAP_CONFIG)
+-  message (STATUS "Looking for pcap-config... ${PCAP_CONFIG}")
+-  execute_process (COMMAND pcap-config --libs
+-    OUTPUT_VARIABLE PCAP_LDFLAGS
+-    OUTPUT_STRIP_TRAILING_WHITESPACE)
+-  execute_process (COMMAND pcap-config --cflags
+-    OUTPUT_VARIABLE PCAP_CFLAGS
+-    OUTPUT_STRIP_TRAILING_WHITESPACE)
+-else (PCAP_CONFIG)
+-  message (STATUS "pcap-config not found, using defaults...")
+-  set (PCAP_LDFLAGS "-L/usr/lib -lpcap")
+-  set (PCAP_CFLAGS "-I/usr/include")
+-endif (PCAP_CONFIG)
++pkg_search_module(PCAP QUIET pcap)
++message (STATUS "Looking for pcap... ${PCAP}")
++if (NOT PCAP_FOUND)
++  pkg_search_module(PCAP QUIET libpcap)
++  message (STATUS "Looking for libpcap... ${PCAP}")
++endif (NOT PCAP_FOUND)
++
++if (NOT PCAP_FOUND)
++  find_library (PCAP pcap)
++  message (STATUS "Looking for pcap... ${PCAP}")
++  if (NOT PCAP)
++    message (SEND_ERROR "The pcap library is required.")
++  endif (NOT PCAP)
++  message (STATUS "Looking for pcap-config...")
++  find_program (PCAP_CONFIG pcap-config)
++
++  if (PCAP_CONFIG)
++    message (STATUS "Looking for pcap-config... ${PCAP_CONFIG}")
++    execute_process (COMMAND pcap-config --libs
++      OUTPUT_VARIABLE PCAP_LDFLAGS
++      OUTPUT_STRIP_TRAILING_WHITESPACE)
++    execute_process (COMMAND pcap-config --cflags
++      OUTPUT_VARIABLE PCAP_CFLAGS
++      OUTPUT_STRIP_TRAILING_WHITESPACE)
++  else (PCAP_CONFIG)
++    message (STATUS "pcap-config not found, using defaults...")
++    set (PCAP_LDFLAGS "-L/usr/lib -lpcap")
++    set (PCAP_CFLAGS "-I/usr/include")
++  endif (PCAP_CONFIG)
++endif (NOT PCAP_FOUND)
+ 
+ find_package (Threads)
+ 
+diff --git a/util/CMakeLists.txt b/util/CMakeLists.txt
+index b0f2000b..730d43f4 100644
+--- a/util/CMakeLists.txt
++++ b/util/CMakeLists.txt
+@@ -62,30 +62,32 @@ else (LIBPAHO)
+ endif (NOT LIBPAHO)
+ 
+ #for gpgmeutils we need libgpgme
+-set (GPGME_MIN_VERSION "1.7.0")
+ message (STATUS "Looking for gpgme...")
+-find_library (GPGME gpgme)
+-if (NOT GPGME)
+-  message (SEND_ERROR "The gpgme library is required.")
+-else (NOT GPGME)
+-  execute_process (COMMAND gpgme-config --version
+-    OUTPUT_VARIABLE GPGME_VERSION
+-    OUTPUT_STRIP_TRAILING_WHITESPACE)
+-  message (STATUS "Found gpgme: ${GPGME}, version ${GPGME_VERSION}")
+-  if (GPGME_VERSION VERSION_LESS GPGME_MIN_VERSION)
+-    message (SEND_ERROR "The gpgme library >= ${GPGME_MIN_VERSION} is required.")
+-  else (GPGME_VERSION VERSION_LESS GPGME_MIN_VERSION)
+-    execute_process (COMMAND gpgme-config --libs
+-      OUTPUT_VARIABLE GPGME_LDFLAGS
++pkg_check_modules (GPGME QUIET gpgme>=1.7.0)
++if (NOT GPGME_FOUND)
++  set (GPGME_MIN_VERSION "1.7.0")
++  find_library (GPGME gpgme)
++  if (NOT GPGME)
++    message (SEND_ERROR "The gpgme library is required.")
++  else (NOT GPGME)
++    execute_process (COMMAND gpgme-config --version
++      OUTPUT_VARIABLE GPGME_VERSION
+       OUTPUT_STRIP_TRAILING_WHITESPACE)
+-    execute_process (COMMAND gpgme-config --cflags
+-      OUTPUT_VARIABLE GPGME_CFLAGS
+-      OUTPUT_STRIP_TRAILING_WHITESPACE)
+-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_FILE_OFFSET_BITS=64 -DLARGEFILE_SOURCE=1")
+-    string(REPLACE "-I" "" GPGME_INCLUDE_DIRS "${GPGME_CFLAGS}")
+-  endif (GPGME_VERSION VERSION_LESS GPGME_MIN_VERSION)
+-endif (NOT GPGME)
+-
++    message (STATUS "Found gpgme: ${GPGME}, version ${GPGME_VERSION}")
++    if (GPGME_VERSION VERSION_LESS GPGME_MIN_VERSION)
++      message (SEND_ERROR "The gpgme library >= ${GPGME_MIN_VERSION} is required.")
++    else (GPGME_VERSION VERSION_LESS GPGME_MIN_VERSION)
++      execute_process (COMMAND gpgme-config --libs
++        OUTPUT_VARIABLE GPGME_LDFLAGS
++        OUTPUT_STRIP_TRAILING_WHITESPACE)
++      execute_process (COMMAND gpgme-config --cflags
++        OUTPUT_VARIABLE GPGME_CFLAGS
++        OUTPUT_STRIP_TRAILING_WHITESPACE)
++      set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_FILE_OFFSET_BITS=64 -DLARGEFILE_SOURCE=1")
++      string(REPLACE "-I" "" GPGME_INCLUDE_DIRS "${GPGME_CFLAGS}")
++    endif (GPGME_VERSION VERSION_LESS GPGME_MIN_VERSION)
++  endif (NOT GPGME)
++endif (NOT GPGME_FOUND)
+ 
+ message (STATUS "Looking for libcrypt...")
+ find_library (CRYPT crypt)
+@@ -102,19 +104,25 @@ else (NOT CRYPT)
+ endif (NOT CRYPT)
+ 
+ message (STATUS "Looking for libgcrypt...")
+-find_library (GCRYPT gcrypt)
++pkg_check_modules (GCRYPT QUIET gcrypt)
++message (STATUS "Looking for libgcrypt... ${GCRYPT}")
++pkg_check_modules (GCRYPT QUIET libgcrypt)
+ message (STATUS "Looking for libgcrypt... ${GCRYPT}")
+-if (NOT GCRYPT)
+-message (SEND_ERROR "The libgcrypt library is required.")
+-else (NOT GCRYPT)
+-execute_process (COMMAND libgcrypt-config --libs
+-    OUTPUT_VARIABLE GCRYPT_LDFLAGS
+-    OUTPUT_STRIP_TRAILING_WHITESPACE)
+-execute_process (COMMAND libgcrypt-config --cflags
+-    OUTPUT_VARIABLE GCRYPT_CFLAGS
+-    OUTPUT_STRIP_TRAILING_WHITESPACE)
+-string(REPLACE "-I" "" GCRYPT_INCLUDE_DIRS "${GCRYPT_CFLAGS}")
+-endif (NOT GCRYPT)
++if (NOT GCRYPT_FOUND)
++  find_library (GCRYPT gcrypt)
++  message (STATUS "Looking for libgcrypt... ${GCRYPT}")
++  if (NOT GCRYPT)
++  message (SEND_ERROR "The libgcrypt library is required.")
++  else (NOT GCRYPT)
++  execute_process (COMMAND libgcrypt-config --libs
++      OUTPUT_VARIABLE GCRYPT_LDFLAGS
++      OUTPUT_STRIP_TRAILING_WHITESPACE)
++  execute_process (COMMAND libgcrypt-config --cflags
++      OUTPUT_VARIABLE GCRYPT_CFLAGS
++      OUTPUT_STRIP_TRAILING_WHITESPACE)
++  string(REPLACE "-I" "" GCRYPT_INCLUDE_DIRS "${GCRYPT_CFLAGS}")
++  endif (NOT GCRYPT)
++endif (NOT GCRYPT_FOUND)
+ 
+ option (BUILD_WITH_RADIUS "Try to build with Radius support" ON)
+ option (BUILD_WITH_LDAP "Try to build with LDAP support" ON)

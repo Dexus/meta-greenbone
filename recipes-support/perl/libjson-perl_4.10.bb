@@ -1,0 +1,29 @@
+SUMMARY = "Perl module to decode/encode json files"
+DESCRIPTION = "This package contains the JSON.pm module with friends. \
+The module implements JSON encode/decode."
+
+HOMEPAGE = "https://metacpan.org/pod/JSON"
+SECTION = "libs"
+LICENSE = "Artistic-1.0 | GPL-1.0-or-later"
+LIC_FILES_CHKSUM = "file://README;beginline=1171;endline=1176;md5=3be2cb8159d094768e67386c453e8bbe"
+
+DEPENDS += "perl"
+
+SRC_URI = "git://github.com/makamaka/JSON.git;protocol=https;branch=master"
+
+SRCREV = "8292cf6cb951556758e3331f892fa6ace52bfbde"
+
+S = "${WORKDIR}/git"
+
+inherit cpan
+
+RDEPENDS:${PN} += "perl"
+
+do_install () {
+	oe_runmake DESTDIR="${D}" install_vendor
+	for PERLSCRIPT in `grep -rIEl '#! *${bindir}/perl-native.*/perl' ${D}`; do
+		sed -i -e 's|${bindir}/perl-native.*/perl|/usr/bin/env nativeperl|' $PERLSCRIPT
+	done
+}
+
+BBCLASSEXTEND = "native nativesdk"

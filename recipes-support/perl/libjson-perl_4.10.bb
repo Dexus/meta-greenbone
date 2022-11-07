@@ -18,12 +18,3 @@ S = "${WORKDIR}/git"
 inherit cpan
 
 RDEPENDS:${PN} += "perl"
-
-do_install () {
-	oe_runmake DESTDIR="${D}" install_vendor
-	for PERLSCRIPT in `grep -rIEl '#! *${bindir}/perl-native.*/perl' ${D}`; do
-		sed -i -e 's|${bindir}/perl-native.*/perl|/usr/bin/env nativeperl|' $PERLSCRIPT
-	done
-}
-
-BBCLASSEXTEND = "native nativesdk"
